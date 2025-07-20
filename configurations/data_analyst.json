@@ -1,0 +1,11 @@
+{
+  "domain_name": "Data Analyst",
+  "job_role_prompt": "a Data Analyst",
+  "skill_categories": {
+    "Core Tools": ["SQL", "Microsoft Excel", "Python (Pandas, NumPy)"],
+    "BI & Visualization": ["Tableau", "Power BI", "Matplotlib"],
+    "Statistics": ["A/B Testing", "Statistical Modeling", "Probability"],
+    "Data Warehousing": ["ETL Processes", "Data Cleaning", "Data Modeling"]
+  },
+  "behavioral_question_context": "data-driven decision making, presenting insights, and data accuracy"
+}

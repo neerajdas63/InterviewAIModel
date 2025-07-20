@@ -1,0 +1,11 @@
+{
+  "domain_name": "Frontend Developer",
+  "job_role_prompt": "a Frontend Developer",
+  "skill_categories": {
+    "Core Technologies": ["HTML", "CSS", "JavaScript (ES6+)"],
+    "Frameworks": ["React.js", "Angular", "Vue.js"],
+    "State Management": ["Redux", "Context API", "Zustand"],
+    "Styling": ["Tailwind CSS", "SASS/SCSS", "Bootstrap"]
+  },
+  "behavioral_question_context": "software development, user interfaces, and team collaboration"
+}

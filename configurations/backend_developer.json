@@ -1,0 +1,11 @@
+{
+  "domain_name": "Backend Developer",
+  "job_role_prompt": "a Backend Developer",
+  "skill_categories": {
+    "Languages": ["Python", "Java", "Node.js", "Go"],
+    "Databases": ["SQL (PostgreSQL, MySQL)", "NoSQL (MongoDB, Redis)"],
+    "APIs & Protocols": ["RESTful APIs", "GraphQL", "gRPC"],
+    "Cloud & DevOps": ["AWS (EC2, S3)", "Docker", "Kubernetes", "CI/CD"]
+  },
+  "behavioral_question_context": "system architecture, data integrity, and scalability"
+}
