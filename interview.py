@@ -1,5 +1,5 @@
 # ==================================================================================
-# FINAL, MULTI-DOMAIN AI INTERVIEW AGENT (with Random Question Count)
+# FINAL, MULTI-DOMAIN AI INTERVIEW AGENT (with Patient Listening)
 # ==================================================================================
 
 # --- Stage 1: Import all necessary libraries ---
@@ -118,22 +118,17 @@ def onboard_candidate() -> Dict:
 ## STAGE 3: THE AI INTERVIEW AGENT CLASS (NOW CONFIGURABLE)  ##
 ## --------------------------------------------------------- ##
 class AIInterviewAgent:
-    # The __init__ method is the constructor, run once when a new agent is created.
     def __init__(self, google_api_key: str, domain_config: Dict):
-        # --- API and Model Configuration ---
         if not google_api_key:
             raise ValueError("Google API key is required.")
         genai.configure(api_key=google_api_key)
         self.model = genai.GenerativeModel('models/gemini-1.5-pro-latest')
         
-        # --- Agent Personality and State ---
         self.domain_config = domain_config
         self.personality = {"name": "Alex", "role": "Senior Technical Interviewer", "tone": "Professional but friendly"}
         
-        # This dictionary holds the current state of the interview as it progresses.
         self.interview_state = {
             "question_count": 0,
-            # ## MODIFIED - The total number of questions is now random between 5 and 10 ##
             "max_questions": random.randint(5, 10),
             "job_role": self.domain_config.get("domain_name", "Technical Professional"),
             "candidate_name": None, "skills_to_assess": [],
@@ -141,9 +136,7 @@ class AIInterviewAgent:
         }
         self.interview_data = {"start_time": None, "questions_asked": [], "answers_received": [], "scores": {}}
 
-    # This method is called after onboarding to configure the agent with the user's profile.
     def initialize_adaptive_interview(self, candidate_profile: Dict):
-        # Set the agent's internal state based on the profile received from onboard_candidate().
         self.interview_state["candidate_name"] = candidate_profile["name"]
         self.interview_state["skills_to_assess"] = candidate_profile["skills"]
         self.interview_state["experience_text"] = candidate_profile["experience"]
@@ -153,13 +146,9 @@ class AIInterviewAgent:
         elif "mid-level" in exp_lower: self.interview_state["difficulty_level"] = "Medium"
         elif "senior" in exp_lower: self.interview_state["difficulty_level"] = "Hard"
         else: self.interview_state["difficulty_level"] = "Expert / Architectural"
-        
-        # Record the start time of the interview.
         self.interview_data["start_time"] = datetime.now()
-        # Generate and return the personalized introduction message.
         return self._generate_introduction()
 
-    # A helper function to centralize all calls to the Gemini API.
     def _call_gemini_api(self, prompt: str) -> str:
         try:
             return self.model.generate_content(prompt).text.strip()
@@ -167,7 +156,6 @@ class AIInterviewAgent:
             print(f"An error occurred with the Gemini API: {e}")
             return "Sorry, I encountered an error."
 
-    # Generates the welcome message, now telling the user the random number of questions.
     def _generate_introduction(self) -> str:
         prompt = f"""
         You are {self.personality['name']}, a {self.personality['role']}. Generate a warm, professional introduction for a candidate named {self.interview_state['candidate_name']}.
@@ -186,19 +174,14 @@ class AIInterviewAgent:
         """
         return self._call_gemini_api(prompt)
 
-    # Decides which type of question to ask next and generates it.
     def generate_next_question(self) -> Dict:
-        # Check if the number of questions asked has reached the random maximum.
         if self.interview_state["question_count"] >= self.interview_state["max_questions"]:
             return {"type": "conclusion"}
         
-        # The first question is always a general introduction.
         if self.interview_state["question_count"] == 0:
             question = f"Great, let's start. To begin, could you please tell me a bit about yourself and your journey as a {self.interview_state['job_role']}?"
             question_type = "introduction"
         else:
-            # Mix in one or two behavioral questions during the interview.
-            # This logic will ask a behavioral question on the 3rd and potentially 7th question turn.
             if self.interview_state["question_count"] == 3 or (self.interview_state["max_questions"] > 7 and self.interview_state["question_count"] == 7):
                 question_type = "behavioral"
             else:
@@ -212,20 +195,17 @@ class AIInterviewAgent:
         self.interview_state["question_count"] += 1
         return {"question": question, "type": question_type}
 
-    # Generates a technical question tailored to the user's profile.
     def _generate_technical_question(self) -> str:
         selected_skill = random.choice(self.interview_state["skills_to_assess"])
         job_role_prompt = self.domain_config.get("job_role_prompt", self.interview_state["job_role"])
         prompt = f"""You are an expert technical interviewer. Generate a single, high-quality interview question for **{job_role_prompt}**. Candidate's Profile: Experience: {self.interview_state['experience_text']}, Difficulty: **{self.interview_state['difficulty_level']}**, Specific Skill to Test: **{selected_skill}**. The question must be practical and its complexity must match the experience level. Return ONLY the question."""
         return self._call_gemini_api(prompt)
 
-    # Generates a behavioral question tailored to the user's profile.
     def _generate_behavioral_question(self) -> str:
         context = self.domain_config.get("behavioral_question_context", "their professional field")
         prompt = f"""You are an expert interviewer. Refine the question "Tell me about a challenging project" to be specific for a {self.interview_state['job_role']} with {self.interview_state['experience_text']} of experience. Tie it to concepts like **{context}**. Return only the refined question."""
         return self._call_gemini_api(prompt)
 
-    # Sends the user's answer to the AI for a score and feedback.
     def evaluate_answer(self, question: str, answer: str) -> Dict:
         prompt = f"""You are an expert interviewer. Evaluate a candidate's answer. Context: Role: {self.interview_state['job_role']}, Experience: {self.interview_state['experience_text']}. Question: "{question}". Candidate's Answer: "{answer}". Provide evaluation in this exact format, with each key on a new line. Be concise.
 SCORE: [A number from 1-10]
@@ -233,7 +213,6 @@ STRENGTHS: [A brief summary]
 IMPROVEMENTS: [A brief summary]"""
         return self._parse_feedback(self._call_gemini_api(prompt))
 
-    # Parses the structured feedback from the AI into a Python dictionary.
     def _parse_feedback(self, feedback: str) -> Dict:
         evaluation = {'score': 0, 'strengths': "N/A", 'improvements': "N/A"}
         try:
@@ -246,7 +225,6 @@ IMPROVEMENTS: [A brief summary]"""
             print(f"Error parsing feedback: {e}\nOriginal: {feedback}")
             return evaluation
 
-    # Generates a comprehensive feedback summary at the end of the interview.
     def _generate_detailed_feedback_summary(self) -> str:
         print("...Compiling detailed feedback...")
         feedback_log = ""
@@ -277,7 +255,6 @@ IMPROVEMENTS: [A brief summary]"""
         """
         return self._call_gemini_api(prompt)
 
-    # Generates the final closing statement of the interview.
     def _generate_conclusion(self) -> Dict:
         detailed_feedback = self._generate_detailed_feedback_summary()
         scores = [ans['evaluation']['score'] for ans in self.interview_data['answers_received'] if 'evaluation' in ans]
@@ -296,7 +273,6 @@ IMPROVEMENTS: [A brief summary]"""
         full_conclusion_message = f"{detailed_feedback} {closing_remarks}"
         return {"type": "conclusion", "message": full_conclusion_message, "overall_score": overall_score}
 
-    # Compiles all collected data into a final summary report.
     def get_interview_summary(self) -> Dict:
         start_time = self.interview_data.get("start_time")
         duration = str(datetime.now() - start_time) if start_time else "N/A"
@@ -316,22 +292,36 @@ IMPROVEMENTS: [A brief summary]"""
         except Exception as e:
             print(f"--- Error in TTS module: {e} ---")
 
+    ## MODIFIED - THE NEW, MORE PATIENT listen() FUNCTION ##
     def listen(self) -> str:
+        """
+        Listens for user's voice input patiently and converts it to text.
+        """
         r = sr.Recognizer()
+        
+        # This setting controls how long the recognizer waits after speech ends.
+        # A higher value means it will wait longer during pauses.
+        r.pause_threshold = 2.0  # Wait for 2 seconds of silence before considering the phrase complete.
+
         with sr.Microphone() as source:
             print("\n🎤 You can take a moment to think. I'm ready to listen...")
             r.adjust_for_ambient_noise(source, duration=1)
             try:
-                audio = r.listen(source, timeout=None, phrase_time_limit=180)
+                # phrase_time_limit allows for very long, continuous speech.
+                audio = r.listen(source, timeout=None, phrase_time_limit=300) # 5 minutes
+                
                 print("🧠 Processing your answer...")
                 user_text = r.recognize_google(audio)
                 print(f"You said: {user_text}")
                 return user_text
             except sr.UnknownValueError:
                 self.speak("I'm sorry, I couldn't quite make that out. Could you please try rephrasing?")
-                return self.listen()
+                return self.listen() # Recursive call to give user another chance
             except sr.RequestError as e:
-                return f"Speech service error: {e}"
+                error_msg = f"There's a problem with the speech service: {e}"
+                print(error_msg)
+                self.speak("It seems there's a connection issue. We'll skip this one.")
+                return error_msg
 
 
 ## ----------------------------------------------------- ##
@@ -362,7 +352,6 @@ if __name__ == "__main__":
         intro = agent.initialize_adaptive_interview(onboarding_data["profile"])
         agent.speak(intro)
         
-        # The main interview loop.
         while agent.interview_state["question_count"] < agent.interview_state["max_questions"]:
             question_data = agent.generate_next_question()
             if question_data.get("type") == "conclusion":
@@ -370,7 +359,6 @@ if __name__ == "__main__":
 
             agent.speak(question_data['question'])
             
-            # Inner loop to handle requests to repeat the question.
             while True:
                 user_answer = agent.listen()
                 repeat_keywords = ["repeat", "pardon", "say that again", "didn't hear"]
@@ -381,7 +369,6 @@ if __name__ == "__main__":
                 else:
                     break
             
-            # Evaluate the answer and store it silently.
             evaluation = agent.evaluate_answer(question_data['question'], user_answer)
             agent.interview_data["answers_received"].append({
                 "question": question_data['question'],
@@ -390,13 +377,11 @@ if __name__ == "__main__":
                 "timestamp": datetime.now()
             })
             
-            # Give a simple, neutral transition phrase instead of immediate feedback.
             if "tell me about yourself" in question_data['question'].lower():
                 agent.speak("Thanks for sharing that background. Now, for our first technical question.")
             else:
                 agent.speak("Okay, thank you. Let's move to the next question.")
         
-        # At the end, generate and speak the comprehensive conclusion with feedback.
         conclusion_data = agent._generate_conclusion()
         agent.speak(conclusion_data.get('message', 'Thank you for your time.'))
 
