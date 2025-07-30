@@ -1,5 +1,7 @@
 # ==================================================================================
-# FINAL, MULTI-DOMAIN AI INTERVIEW AGENT (with Patient Listening)
+# AI INTERVIEW AGENT LIBRARY (interview.py)
+# This file contains the core logic and classes for the AI agent.
+# It is intended to be imported by a server application (like Flask) and not run directly.
 # ==================================================================================
 
 # --- Stage 1: Import all necessary libraries ---
@@ -14,15 +16,17 @@ from datetime import datetime
 import re
 from typing import Dict, List
 
+# Load environment variables, which will be used by the importing script (e.g., api.py)
 load_dotenv()
 
 ## ------------------------------------------------------------------ ##
-## STAGE 2: ONBOARDING AND CONFIGURATION                              ##
+## STAGE 2: HELPER FUNCTION FOR CONFIGURATION                         ##
 ## ------------------------------------------------------------------ ##
 
 def load_domain_config(domain_file: str) -> Dict:
     """Loads the specific JSON configuration file for the selected domain."""
     try:
+        # The path to the configurations folder.
         path = os.path.join('configurations', domain_file)
         with open(path, 'r') as f:
             return json.load(f)
@@ -33,89 +37,8 @@ def load_domain_config(domain_file: str) -> Dict:
         print(f"Error: Could not parse the JSON in {path}")
         return None
 
-def onboard_candidate() -> Dict:
-    """
-    Interactively gathers the candidate's domain, name, experience, and skills.
-    Returns a dictionary containing the candidate's complete profile and chosen domain config.
-    """
-    print("=== Welcome to the Adaptive AI Interviewer ===")
-    try:
-        config_files = {str(i+1): f for i, f in enumerate(os.listdir('configurations')) if f.endswith('.json')}
-    except FileNotFoundError:
-        print("\n[FATAL ERROR] The 'configurations' folder was not found.")
-        return None
-    if not config_files:
-        print("\n[FATAL ERROR] No .json config files found in the 'configurations' folder.")
-        return None
-        
-    print("\n▶ Please select your interview domain:")
-    for key, filename in config_files.items():
-        pretty_name = filename.replace('_', ' ').replace('.json', '').title()
-        print(f"  {key}: {pretty_name}")
-    
-    domain_config = None
-    while not domain_config:
-        choice = input("Enter the number of your choice: ")
-        if choice in config_files:
-            domain_config = load_domain_config(config_files[choice])
-            if not domain_config:
-                print("Issue with that configuration. Please try another.")
-        else:
-            print("Invalid selection. Please try again.")
-
-    candidate_name = input(f"\n▶ You've selected {domain_config['domain_name']}. Please type your name to begin: ") or "Candidate"
-    print(f"\nHello, {candidate_name}! Let's set up your interview profile.")
-    
-    print("\n▶ Please enter your total years of professional experience (e.g., 0, 1, 5, 10).")
-    experience_text = ""
-    while True:
-        try:
-            years = int(input("Enter years of experience: "))
-            if years < 0:
-                print("Experience cannot be negative. Please try again.")
-                continue
-            if 0 <= years <= 1: experience_text = "Fresher (0-1 year)"
-            elif 2 <= years <= 3: experience_text = "Junior (1-3 years)"
-            elif 4 <= years <= 5: experience_text = "Mid-Level (3-5 years)"
-            elif 6 <= years <= 8: experience_text = "Senior (5-8 years)"
-            else: experience_text = "Lead/Principal (8+ years)"
-            print(f"✓ Great! We'll set the interview for a '{experience_text}' level.")
-            break
-        except ValueError:
-            print("Invalid input. Please enter a whole number.")
-
-    print(f"\n▶ Now, let's select your key skills for the {domain_config['domain_name']} interview.")
-    skill_categories = domain_config.get("skill_categories", {})
-    all_skills = [skill for sublist in skill_categories.values() for skill in sublist]
-    
-    print("Enter the numbers of the skills you want to be interviewed on (e.g., '1 4 8').")
-    for i, skill in enumerate(all_skills, 1):
-        print(f"  {i:2d}: {skill}")
-    
-    selected_skills = []
-    while not selected_skills:
-        try:
-            choices_str = input("Your choices: ")
-            chosen_indices = [int(x.strip()) - 1 for x in choices_str.split()]
-            valid_choices = [idx for idx in chosen_indices if 0 <= idx < len(all_skills)]
-            if not valid_choices:
-                print("Invalid selection. Please try again.")
-                continue
-            selected_skills = [all_skills[i] for i in valid_choices]
-        except ValueError:
-            print("Invalid input. Please enter numbers separated by spaces.")
-
-    print(f"\nGreat! We will focus on: {', '.join(selected_skills)}")
-    print("--------------------------------------------------\n")
-    
-    return {
-        "profile": {"name": candidate_name, "experience": experience_text, "skills": selected_skills},
-        "config": domain_config
-    }
-
-
 ## --------------------------------------------------------- ##
-## STAGE 3: THE AI INTERVIEW AGENT CLASS (NOW CONFIGURABLE)  ##
+## STAGE 3: THE AI INTERVIEW AGENT CLASS                     ##
 ## --------------------------------------------------------- ##
 class AIInterviewAgent:
     def __init__(self, google_api_key: str, domain_config: Dict):
@@ -279,6 +202,9 @@ IMPROVEMENTS: [A brief summary]"""
         return {"candidate_name": self.interview_state["candidate_name"], "job_role": self.interview_state["job_role"], "duration": duration, "overall_rating": self.interview_data.get("overall_rating", 0), "questions_and_answers": self.interview_data["answers_received"], "skills_assessed": self.interview_state["skills_to_assess"]}
 
     # --- VOICE I/O FUNCTIONS ---
+    # NOTE: These functions (speak, listen) are part of the agent's logic for defining its
+    # capabilities, but they are NOT used by the Flask server. The server will not speak or listen.
+    # The actual speaking and listening will happen in the React frontend using browser APIs.
     def speak(self, text: str):
         try:
             print(f"\nAlex: {text}")
@@ -292,106 +218,24 @@ IMPROVEMENTS: [A brief summary]"""
         except Exception as e:
             print(f"--- Error in TTS module: {e} ---")
 
-    ## MODIFIED - THE NEW, MORE PATIENT listen() FUNCTION ##
     def listen(self) -> str:
-        """
-        Listens for user's voice input patiently and converts it to text.
-        """
         r = sr.Recognizer()
-        
-        # This setting controls how long the recognizer waits after speech ends.
-        # A higher value means it will wait longer during pauses.
-        r.pause_threshold = 2.0  # Wait for 2 seconds of silence before considering the phrase complete.
-
+        r.pause_threshold = 2.0
         with sr.Microphone() as source:
             print("\n🎤 You can take a moment to think. I'm ready to listen...")
             r.adjust_for_ambient_noise(source, duration=1)
             try:
-                # phrase_time_limit allows for very long, continuous speech.
-                audio = r.listen(source, timeout=None, phrase_time_limit=300) # 5 minutes
-                
+                audio = r.listen(source, timeout=None, phrase_time_limit=300)
                 print("🧠 Processing your answer...")
                 user_text = r.recognize_google(audio)
                 print(f"You said: {user_text}")
                 return user_text
             except sr.UnknownValueError:
                 self.speak("I'm sorry, I couldn't quite make that out. Could you please try rephrasing?")
-                return self.listen() # Recursive call to give user another chance
+                return self.listen()
             except sr.RequestError as e:
-                error_msg = f"There's a problem with the speech service: {e}"
-                print(error_msg)
-                self.speak("It seems there's a connection issue. We'll skip this one.")
-                return error_msg
+                return f"Speech service error: {e}"
 
-
-## ----------------------------------------------------- ##
-## STAGE 4: MAIN EXECUTION BLOCK                         ##
-## ----------------------------------------------------- ##
-if __name__ == "__main__":
-    try:
-        import pyttsx3
-    except ImportError:
-        print("The 'pyttsx3' library is not found. Please run: pip install pyttsx3")
-        exit()
-
-    api_key = os.getenv("GOOGLE_API_KEY")
-    if not api_key:
-        print("Error: GOOGLE_API_KEY environment variable not set.")
-        exit()
-    
-    try:
-        onboarding_data = onboard_candidate()
-        if not onboarding_data:
-            exit()
-            
-        agent = AIInterviewAgent(
-            google_api_key=api_key,
-            domain_config=onboarding_data["config"]
-        )
-        
-        intro = agent.initialize_adaptive_interview(onboarding_data["profile"])
-        agent.speak(intro)
-        
-        while agent.interview_state["question_count"] < agent.interview_state["max_questions"]:
-            question_data = agent.generate_next_question()
-            if question_data.get("type") == "conclusion":
-                break
-
-            agent.speak(question_data['question'])
-            
-            while True:
-                user_answer = agent.listen()
-                repeat_keywords = ["repeat", "pardon", "say that again", "didn't hear"]
-                if any(keyword in user_answer.lower() for keyword in repeat_keywords):
-                    agent.speak("Of course, I'll repeat the question.")
-                    agent.speak(question_data['question'])
-                    continue
-                else:
-                    break
-            
-            evaluation = agent.evaluate_answer(question_data['question'], user_answer)
-            agent.interview_data["answers_received"].append({
-                "question": question_data['question'],
-                "answer": user_answer,
-                "evaluation": evaluation,
-                "timestamp": datetime.now()
-            })
-            
-            if "tell me about yourself" in question_data['question'].lower():
-                agent.speak("Thanks for sharing that background. Now, for our first technical question.")
-            else:
-                agent.speak("Okay, thank you. Let's move to the next question.")
-        
-        conclusion_data = agent._generate_conclusion()
-        agent.speak(conclusion_data.get('message', 'Thank you for your time.'))
-
-        summary = agent.get_interview_summary()
-        print(f"\n\n=== Final Interview Summary ===")
-        print(f"Candidate: {summary['candidate_name']} ({summary['job_role']})")
-        print(f"Stated Experience: {agent.interview_state['experience_text']}")
-        print(f"Overall Rating: {summary['overall_rating']:.1f}/10")
-        print(f"Duration: {summary['duration']}")
-        print(f"Skills Assessed: {summary['skills_assessed']}")
-
-    except Exception as e:
-        print(f"\nAn unexpected error occurred during the interview process: {e}")
+# --- NOTE: The `if __name__ == "__main__"` block has been removed. ---
+# This file is now a library and should not be run directly.
+# The `interview_api.py` file is the new entry point for running the application.
